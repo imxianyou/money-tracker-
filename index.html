@@ -1,0 +1,362 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Wallet, 
+  PlusCircle, 
+  MinusCircle, 
+  History, 
+  PieChart, 
+  TrendingUp, 
+  TrendingDown, 
+  Trash2,
+  Calendar,
+  Tag,
+  Search
+} from 'lucide-react';
+
+const App = () => {
+  // 거래 내역 상태 관리
+  const [transactions, setTransactions] = useState([]);
+  
+  // 입력 폼 상태 관리
+  const [formData, setFormData] = useState({
+    date: new Date().toISOString().split('T')[0],
+    amount: '',
+    type: 'income', // 'income' (입금) 또는 'expense' (출금)
+    category: '',
+    description: ''
+  });
+
+  // 검색 및 필터 상태 관리
+  const [filter, setFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // 컴포넌트 마운트 시 로컬 스토리지에서 데이터 로드
+  useEffect(() => {
+    const savedData = localStorage.getItem('badminton_dues_data');
+    if (savedData) {
+      try {
+        setTransactions(JSON.parse(savedData));
+      } catch (e) {
+        console.error("Failed to load data", e);
+      }
+    }
+  }, []);
+
+  // 거래 내역이 변경될 때마다 로컬 스토리지에 자동 저장
+  useEffect(() => {
+    localStorage.setItem('badminton_dues_data', JSON.stringify(transactions));
+  }, [transactions]);
+
+  // 통계 계산 (수입, 지출, 잔액)
+  const stats = useMemo(() => {
+    const totalIncome = transactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+    
+    const totalExpense = transactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+    
+    return {
+      income: totalIncome,
+      expense: totalExpense,
+      balance: totalIncome - totalExpense
+    };
+  }, [transactions]);
+
+  // 필터링 및 정렬된 거래 내역
+  const filteredTransactions = transactions
+    .filter(t => {
+      const matchesFilter = filter === 'all' || t.type === filter;
+      const matchesSearch = 
+        t.category.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        (t.description && t.description.toLowerCase().includes(searchTerm.toLowerCase()));
+      return matchesFilter && matchesSearch;
+    })
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  // 입력값 변경 핸들러
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // 내역 추가 핸들러
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.amount || !formData.category) return;
+
+    const newTransaction = {
+      id: Date.now(),
+      ...formData,
+      amount: Math.abs(Number(formData.amount))
+    };
+
+    setTransactions(prev => [newTransaction, ...prev]);
+    
+    // 폼 초기화 (날짜와 타입은 유지하거나 기본값으로)
+    setFormData({
+      date: new Date().toISOString().split('T')[0],
+      amount: '',
+      type: formData.type, 
+      category: '',
+      description: ''
+    });
+  };
+
+  // 내역 삭제 핸들러
+  const deleteTransaction = (id) => {
+    if (window.confirm('이 내역을 삭제하시겠습니까?')) {
+      setTransactions(prev => prev.filter(t => t.id !== id));
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans">
+      <div className="max-w-5xl mx-auto">
+        {/* 헤더 섹션 */}
+        <header className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-2">
+              <Wallet className="text-blue-600" />
+              배드민턴 회비 매니저
+            </h1>
+            <p className="text-slate-500">모임의 입출금 내역을 투명하게 관리하세요</p>
+          </div>
+        </header>
+
+        {/* 요약 대시보드 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-slate-500 text-sm font-medium">현재 잔액</span>
+              <PieChart className="text-blue-500 w-5 h-5" />
+            </div>
+            <div className={`text-2xl font-bold ${stats.balance >= 0 ? 'text-slate-800' : 'text-red-500'}`}>
+              ₩ {stats.balance.toLocaleString()}
+            </div>
+          </div>
+          
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-slate-500 text-sm font-medium">총 수입 (+)</span>
+              <TrendingUp className="text-green-500 w-5 h-5" />
+            </div>
+            <div className="text-2xl font-bold text-green-600">
+              ₩ {stats.income.toLocaleString()}
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-slate-500 text-sm font-medium">총 지출 (-)</span>
+              <TrendingDown className="text-red-500 w-5 h-5" />
+            </div>
+            <div className="text-2xl font-bold text-red-600">
+              ₩ {stats.expense.toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* 입력 폼 섹션 */}
+          <div className="lg:col-span-1">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-8">
+              <h2 className="text-xl font-bold mb-6 text-slate-800 flex items-center gap-2">
+                <PlusCircle className="text-blue-600 w-5 h-5" />
+                내역 추가
+              </h2>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">날짜</label>
+                  <input
+                    type="date"
+                    name="date"
+                    value={formData.date}
+                    onChange={handleInputChange}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    required
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData(p => ({ ...p, type: 'income' }))}
+                    className={`p-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all ${
+                      formData.type === 'income' 
+                      ? 'bg-green-100 text-green-700 border-2 border-green-500' 
+                      : 'bg-slate-50 text-slate-400 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <PlusCircle size={18} /> 입금
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(p => ({ ...p, type: 'expense' }))}
+                    className={`p-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition-all ${
+                      formData.type === 'expense' 
+                      ? 'bg-red-100 text-red-700 border-2 border-red-500' 
+                      : 'bg-slate-50 text-slate-400 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <MinusCircle size={18} /> 출금
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">금액 (원)</label>
+                  <input
+                    type="number"
+                    name="amount"
+                    placeholder="0"
+                    value={formData.amount}
+                    onChange={handleInputChange}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">분류 (이름/항목)</label>
+                  <input
+                    type="text"
+                    name="category"
+                    placeholder="예: 김민수, 셔틀콕 구매"
+                    value={formData.category}
+                    onChange={handleInputChange}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">상세 메모</label>
+                  <textarea
+                    name="description"
+                    rows="2"
+                    placeholder="상세 내용을 입력하세요 (선택)"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
+                  ></textarea>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg shadow-blue-100 transition-all active:scale-[0.98]"
+                >
+                  기록 저장하기
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* 내역 목록 섹션 */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="p-6 border-b border-slate-100">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <History className="text-slate-400 w-5 h-5" />
+                    활동 내역
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1 md:flex-none">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <input 
+                        type="text"
+                        placeholder="이름/분류 검색..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-full text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all w-full md:w-48"
+                      />
+                    </div>
+                    <select 
+                      value={filter}
+                      onChange={(e) => setFilter(e.target.value)}
+                      className="p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none cursor-pointer"
+                    >
+                      <option value="all">전체 내역</option>
+                      <option value="income">입금 내역</option>
+                      <option value="expense">출금 내역</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                {filteredTransactions.length === 0 ? (
+                  <div className="py-24 text-center text-slate-400">
+                    <History className="w-16 h-16 mx-auto mb-4 opacity-10" />
+                    <p className="text-lg">기록된 내역이 없습니다.</p>
+                    <p className="text-sm">왼쪽 폼에서 새로운 내역을 추가해 보세요.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                      <tr>
+                        <th className="px-6 py-4 font-semibold">일자</th>
+                        <th className="px-6 py-4 font-semibold">분류</th>
+                        <th className="px-6 py-4 font-semibold">메모</th>
+                        <th className="px-6 py-4 text-right font-semibold">금액</th>
+                        <th className="px-6 py-4 text-center font-semibold">작업</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredTransactions.map((t) => (
+                        <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                            <div className="flex items-center gap-2">
+                              <Calendar size={14} className="text-slate-400" />
+                              {t.date}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold border ${
+                              t.type === 'income' 
+                              ? 'bg-green-50 text-green-700 border-green-100' 
+                              : 'bg-red-50 text-red-700 border-red-100'
+                            }`}>
+                              <Tag size={12} className="mr-1.5 opacity-70" />
+                              {t.category}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-500 max-w-[150px] truncate">
+                            {t.description || '-'}
+                          </td>
+                          <td className={`px-6 py-4 whitespace-nowrap text-right font-bold text-base ${
+                            t.type === 'income' ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {t.type === 'income' ? '+' : '-'} {Number(t.amount).toLocaleString()}원
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <button 
+                              onClick={() => deleteTransaction(t.id)}
+                              className="text-slate-300 hover:text-red-500 transition-colors p-2 rounded-full hover:bg-red-50"
+                              title="삭제"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              
+              {filteredTransactions.length > 0 && (
+                <div className="p-4 bg-slate-50 text-center text-xs text-slate-400 border-t border-slate-100">
+                  총 {filteredTransactions.length}개의 내역을 표시 중입니다.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;
