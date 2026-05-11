@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>배드민턴 클럽 회비 마스터</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & Babel CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // Lucide Icon Component Helper
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const [iconSvg, setIconSvg] = useState("");
+            useEffect(() => {
+                if (window.lucide) {
+                    const icon = window.lucide.icons[name];
+                    if (icon) {
+                        const svg = window.lucide.createIcons({
+                            icons: { [name]: icon },
+                            attrs: { strokeWidth: 2, size, class: className }
+                        });
+                    }
+                }
+            }, [name, size, className]);
+            
+            // Fallback manually for specific icons using simple spans if lucide takes time to render
+            return <i data-lucide={name} className={className} style={{width: size, height: size}}></i>;
+        };
+
+        const App = () => {
+            const [transactions, setTransactions] = useState([]);
+            const [shuttlecockStock, setShuttlecockStock] = useState(0);
+            const [formData, setFormData] = useState({
+                date: new Date().toISOString().split('T')[0],
+                amount: '',
+                type: 'income',
+                category: '',
+                detail: '',
+                shuttlecocksIncluded: 0
+            });
+            const [filter, setFilter] = useState('all');
+            const [searchTerm, setSearchTerm] = useState('');
+
+            useEffect(() => {
+                const savedData = localStorage.getItem('badminton_club_dues');
+                const savedStock = localStorage.getItem('badminton_club_stock');
+                if (savedData) setTransactions(JSON.parse(savedData));
+                else {
+                    setTransactions([
+                        { id: 1, date: '2024-05-01', category: '정기회비', detail: '5월 정기회원 12명', type: 'income', amount: 120000 },
+                        { id: 2, date: '2024-05-02', category: '물품구입', detail: '셔틀콕 2타 (AS-30)', type: 'expense', amount: 64000 },
+                    ]);
+                }
+                if (savedStock) setShuttlecockStock(parseInt(savedStock));
+                else setShuttlecockStock(24);
+
+                // Initialize Lucide Icons
+                setTimeout(() => window.lucide.createIcons(), 100);
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('badminton_club_dues', JSON.stringify(transactions));
+                localStorage.setItem('badminton_club_stock', shuttlecockStock.toString());
+                setTimeout(() => window.lucide.createIcons(), 10);
+            }, [transactions, shuttlecockStock]);
+
+            const stats = useMemo(() => {
+                const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + Number(t.amount), 0);
+                const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + Number(t.amount), 0);
+                return { totalIncome, totalExpense, balance: totalIncome - totalExpense };
+            }, [transactions]);
+
+            const filteredTransactions = transactions
+                .filter(t => {
+                    const matchesFilter = filter === 'all' || t.type === filter;
+                    const matchesSearch = t.category.includes(searchTerm) || t.detail.includes(searchTerm);
+                    return matchesFilter && matchesSearch;
+                })
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                setFormData(prev => ({ ...prev, [name]: value }));
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (!formData.amount || !formData.category) return;
+                const newTransaction = { ...formData, id: Date.now(), amount: parseInt(formData.amount) };
+                setTransactions([newTransaction, ...transactions]);
+                if (formData.shuttlecocksIncluded > 0) setShuttlecockStock(prev => prev + parseInt(formData.shuttlecocksIncluded));
+                setFormData({ date: new Date().toISOString().split('T')[0], amount: '', type: 'income', category: '', detail: '', shuttlecocksIncluded: 0 });
+            };
+
+            const useShuttlecock = () => { if (shuttlecockStock > 0) setShuttlecockStock(prev => prev - 1); };
+            const deleteTransaction = (id) => { if (window.confirm('기록을 삭제하시겠습니까?')) setTransactions(transactions.filter(t => t.id !== id)); };
+
+            return (
+                <div className="min-h-screen p-4 md:p-8">
+                    <div className="max-w-6xl mx-auto">
+                        <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="bg-indigo-600 p-2 rounded-lg text-white">
+                                        <i data-lucide="wallet"></i>
+                                    </div>
+                                    <h1 className="text-3xl font-extrabold tracking-tight">🏸 배드민턴 클럽 회비 마스터</h1>
+                                </div>
+                                <p className="text-slate-500">우리 모임의 소중한 회비와 소모품을 관리하세요.</p>
+                            </div>
+                            <div className="bg-white px-6 py-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                                <div className="bg-orange-100 p-2 rounded-lg text-orange-600">
+                                    <i data-lucide="package"></i>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">남은 셔틀콕</p>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xl font-black text-slate-800">{shuttlecockStock} <span className="text-sm font-medium text-slate-400">개</span></span>
+                                        <button onClick={useShuttlecock} className="bg-slate-100 hover:bg-slate-200 p-1 px-2 rounded text-slate-600 text-[11px] font-bold flex items-center gap-1">
+                                            <i data-lucide="minus" size="12"></i> 1개 사용
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </header>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                                <p className="text-sm font-semibold text-slate-400 mb-1">현재 잔액</p>
+                                <h2 className={`text-3xl font-black ${stats.balance >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>₩ {stats.balance.toLocaleString()}</h2>
+                                <p className="mt-4 text-xs text-slate-400 flex items-center gap-1">
+                                    <i data-lucide="activity" size="12"></i> {stats.balance >= 0 ? '안정적으로 운영되고 있습니다.' : '예산 관리가 필요합니다.'}
+                                </p>
+                            </div>
+                            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                                <p className="text-sm font-semibold text-slate-400 mb-1">누적 수입</p>
+                                <h2 className="text-3xl font-black text-emerald-600">₩ {stats.totalIncome.toLocaleString()}</h2>
+                                <p className="mt-4 text-xs text-slate-400 font-bold uppercase tracking-widest">Inflow</p>
+                            </div>
+                            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                                <p className="text-sm font-semibold text-slate-400 mb-1">누적 지출</p>
+                                <h2 className="text-3xl font-black text-rose-500">₩ {stats.totalExpense.toLocaleString()}</h2>
+                                <p className="mt-4 text-xs text-slate-400 font-bold uppercase tracking-widest">Outflow</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            <div className="lg:col-span-4">
+                                <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 sticky top-8">
+                                    <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                                        <i data-lucide="plus-circle" className="text-indigo-600"></i> 새 내역 추가
+                                    </h3>
+                                    <form onSubmit={handleSubmit} className="space-y-5">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">날짜</label>
+                                            <input type="date" name="date" value={formData.date} onChange={handleInputChange} className="w-full bg-slate-50 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500" required />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">유형</label>
+                                            <div className="flex p-1 bg-slate-50 rounded-xl">
+                                                <button type="button" onClick={() => setFormData(p => ({ ...p, type: 'income' }))} className={`flex-1 py-2 rounded-lg text-sm font-bold ${formData.type === 'income' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>수입</button>
+                                                <button type="button" onClick={() => setFormData(p => ({ ...p, type: 'expense' }))} className={`flex-1 py-2 rounded-lg text-sm font-bold ${formData.type === 'expense' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500'}`}>지출</button>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">카테고리</label>
+                                            <input type="text" name="category" placeholder="예: 회비, 셔틀콕" value={formData.category} onChange={handleInputChange} className="w-full bg-slate-50 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500" required />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">금액(원)</label>
+                                                <input type="number" name="amount" value={formData.amount} onChange={handleInputChange} className="w-full bg-slate-50 rounded-xl p-3 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500" required />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">콕 추가(개)</label>
+                                                <input type="number" name="shuttlecocksIncluded" value={formData.shuttlecocksIncluded} onChange={handleInputChange} className="w-full bg-slate-50 rounded-xl p-3 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500" />
+                                            </div>
+                                        </div>
+                                        <button type="submit" className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition-all active:scale-95">기록 완료</button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <div className="lg:col-span-8">
+                                <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                                    <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row justify-between gap-4">
+                                        <h3 className="text-xl font-bold flex items-center gap-2"><i data-lucide="history" className="text-slate-400"></i> 거래 내역</h3>
+                                        <div className="flex gap-2">
+                                            <input type="text" placeholder="검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="px-4 py-2 bg-slate-50 rounded-full text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+                                            <select value={filter} onChange={(e) => setFilter(e.target.value)} className="px-4 py-2 bg-slate-50 rounded-full text-sm outline-none cursor-pointer">
+                                                <option value="all">전체</option>
+                                                <option value="income">수입</option>
+                                                <option value="expense">지출</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-widest text-slate-400">
+                                                <tr>
+                                                    <th className="px-8 py-4">일자</th>
+                                                    <th className="px-8 py-4">항목</th>
+                                                    <th className="px-8 py-4 text-right">금액</th>
+                                                    <th className="px-8 py-4 text-center">작업</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50">
+                                                {filteredTransactions.map(t => (
+                                                    <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                                                        <td className="px-8 py-5 text-sm text-slate-500">{t.date}</td>
+                                                        <td className="px-8 py-5">
+                                                            <span className={`px-3 py-1 rounded-full text-[11px] font-bold ${t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>{t.category}</span>
+                                                        </td>
+                                                        <td className={`px-8 py-5 text-right font-bold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                                                            {t.type === 'income' ? '+' : '-'} {t.amount.toLocaleString()}
+                                                        </td>
+                                                        <td className="px-8 py-5 text-center">
+                                                            <button onClick={() => deleteTransaction(t.id)} className="text-slate-300 hover:text-rose-500 p-2 transition-colors"><i data-lucide="trash-2" size="16"></i></button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
